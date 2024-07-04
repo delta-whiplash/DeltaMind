@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# first edit 
+
 REPO="anyproto/anytype-heart"
 FILE="addon.tar.gz"
 GITHUB="api.github.com"
