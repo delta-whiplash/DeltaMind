@@ -6,7 +6,7 @@ on:
       - v*
 
 permissions:
-  contents: 'write'
+  contents: write
 
 jobs:
   release:
@@ -19,50 +19,50 @@ jobs:
           - windows-latest
 
     steps:
-      - name: Setup
-        run: |
-          git config --global url      - name: Install Go
-        uses: actions/setup-go@v1
-        with:
-          go-version: 1.22
+      - name: Checkout Git repository
+        uses: actions/checkout@v2
 
-      - name: Setup GO
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22' # Consider using latest stable version
+
+      - name: Setup Go Environment
         run: |
           go version
-          echo GOPATH=$(go env GOPATH) >> $GITHUB_ENV      - name: Check out Git repository
-        uses: actions/checkout@v1
+          echo "GOPATH=$(go env GOPATH)" >> $GITHUB_ENV
 
       - name: Setup distutils
         if: matrix.os != 'windows-latest'
         run: sudo -H pip install setuptools
 
-      - name: Install Node.js, NPM and Yarn
-        uses: actions/setup-node@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: 20.9.0
+          node-version: '20.9.0' # Consider using latest LTS version
 
-      - name: Install Webpack
-        run: npm install --save-dev webpack-cli --legacy-peer-deps
+      - name: Install dependencies
+        run: npm install
 
       - name: Update locale
         run: npm run update:locale
         env:
-          GITHUB_TOKEN: ${{secrets.TOKEN}}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
 
-      #- name: Update Deps
-      #  run: npm run build:deps
+      # - name: Update Deps
+      #   run: npm run build:deps
 
       - name: Update Addon Windows
         if: matrix.os == 'windows-latest'
+        run: ./update-ci.sh ${{ secrets.USER }} ${{ secrets.TOKEN }} ${{ matrix.os }}
         shell: bash
-        run: ./update-ci.sh ${{secrets.USER}} ${{secrets.TOKEN}} ${{matrix.os}}
 
-      - name: Update Addon
+      - name: Update Addon Linux
         if: matrix.os != 'windows-latest'
-        shell: bash
         run: |
-          ./update-ci.sh ${{secrets.USER}} ${{secrets.TOKEN}} ${{matrix.os}} arm
-          ./update-ci.sh ${{secrets.USER}} ${{secrets.TOKEN}} ${{matrix.os}} amd
+          ./update-ci.sh ${{ secrets.USER }} ${{ secrets.TOKEN }} ${{ matrix.os }} arm
+          ./update-ci.sh ${{ secrets.USER }} ${{ secrets.TOKEN }} ${{ matrix.os }} amd
+        shell: bash
 
       - name: Build Native Messaging Host Windows
         if: matrix.os == 'windows-latest'
@@ -70,45 +70,34 @@ jobs:
         env:
           CGO_ENABLED: 0
 
-      - name: Build Native Messaging Host
+      - name: Build Native Messaging Host Linux
         if: matrix.os != 'windows-latest'
         run: npm run build:nmh
         env:
           CGO_ENABLED: 0
 
-      - name: Build Front 
+      - name: Build Front
         uses: samuelmeuli/action-electron-builder@v1
         with:
-          github_token: ${{secrets.TOKEN}}
+          github_token: ${{ secrets.TOKEN }}
           release: ${{ startsWith(github.ref, 'refs/tags/v') }}
         env:
           DEBUG: electron-builder
           USE_HARD_LINKS: false
-          GITHUB_TOKEN: ${{secrets.TOKEN}}
-          
-      - name: Make artifacts dir
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+
+      - name: Package Artifacts
         run: |
           mkdir -p artifacts
-
-      - name: Cleanup artifacts
-        if: matrix.os != 'windows-latest'
-        run: |
-          mv dist/*.{zip,dmg,deb,AppImage,exe,snap,rpm,tar.gz} artifacts || true
-
-      - name: Cleanup artifacts Windows
-        if: matrix.os == 'windows-latest'
-        run: |
-          rm dist/anytypeHelper.exe
-          rm dist/nativeMessagingHost.exe
-          mv dist/*.exe artifacts
+          mv dist/* artifacts || true
 
       - name: Release
-        uses: softprops/action-gh-release@v0.1.14
+        uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: "artifacts/**"
+          files: artifacts/**
         env:
-          GITHUB_TOKEN: ${{secrets.TOKEN}}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
 
       - name: Delete old releases
         uses: dev-drprasad/delete-older-releases@v0.2.0
